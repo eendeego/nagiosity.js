@@ -9,7 +9,7 @@ The original project can be found at http://code.google.com/p/nagiosity/
 
 ### What is nagiosity ?
 
-Nagiosity is a python CGI originaly written by Matt Joyce that reads the [Nagios]{http://www.nagios.org/} status file and renders
+Nagiosity is a python CGI originaly written by Matt Joyce that reads the [Nagios](http://www.nagios.org/) status file and renders
 it in an XML proper for another script/application consumption.
 
 ## Instructions / Configuration
