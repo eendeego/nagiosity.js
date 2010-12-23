@@ -7,6 +7,11 @@ This is just a port of nagiosity with an aditional goodness of JSON output.
 
 The original project can be found at http://code.google.com/p/nagiosity/
 
+### What is nagiosity ?
+
+Nagiosity is a python CGI originaly written by Matt Joyce that reads the [Nagios]{http://www.nagios.org/} status file and renders
+it in an XML proper for another script/application consumption.
+
 ## Instructions / Configuration
 
 Install this script and its configuration file on a user/dir with access to nagios's nagios.dat file.
@@ -14,8 +19,10 @@ Install this script and its configuration file on a user/dir with access to nagi
 Copy the config.js.sample file to config.js and customize it.
 
 Note: You may or may not be making too much information available through this app. If this is your situation here are 2 solutions:
-    * Place an Apache / Nginx server with a proper authentication mechanism in front of this script if this is an issue for you.
-    * Serve only to localhost and install clients to this app on the same machine.
+* Place an Apache / Nginx server with a proper authentication mechanism in front of this script if this is an issue for you.
+* Serve only to localhost and install clients to this app on the same machine.
+
+This script has been tested with node.js 0.2.4 and 0.3.2 and with Nagios 3.2.3.
 
 ## Usage
 (Default parameters)
