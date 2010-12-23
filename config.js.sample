@@ -1,0 +1,7 @@
+// Copy this file to config.js and customize it.
+// To bind to any IP address, remove the host entry below
+
+module.exports = {
+  nagios: { status_file: "/usr/local/nagios/var/status.dat" },
+  server: { host: "127.0.0.1", port: 3999, path: '/nagios/status' }
+}
