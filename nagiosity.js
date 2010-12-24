@@ -19,18 +19,18 @@ var PROGRAM_LABEL = "programstatus";
 
 // http://stackoverflow.com/questions/18082/validate-numbers-in-javascript-isnumeric
 function isNumeric(input) {
-   return (input - 0) == input && input.length > 0;
+   return input.length > 0 && (input - 0) == input;
 }
 
 // Parse the status.dat file and extract matching object definitions
-function readStatus(filename) {
+function parseStatus(data) {
   var status_dat = {};
   var status = {};
 
   status_dat[HOST_LABEL] = [];
   status_dat[SERVICE_LABEL] = [];
 
-  fs.readFileSync(filename, 'utf8').
+  data.
     replace(/^\t([^=\n]+)=([^\n]*)\n/gm,
       function(str, name, value, offset, s) {
         return "\"" + name + "\":" +
@@ -179,11 +179,18 @@ http.createServer(function (req, res) {
 
   var verboseness = req_url.search == '?verbose' ? 'verbose' : 'simple';
 
-  var out = formatters[format][verboseness](readStatus(config.nagios.status_file));
+  fs.readFile(config.nagios.status_file, 'utf8', function(err, data) {
+      if (err) {
+        res.writeHead(500);
+        throw err;
+      }
 
-  res.writeHead(200, {
-      'Content-Length': out.length,
-      'Content-Type': mime_types[format]
+      var out = formatters[format][verboseness](parseStatus(data));
+
+      res.writeHead(200, {
+          'Content-Length': out.length,
+          'Content-Type': mime_types[format]
+        });
+      res.end(out);
     });
-  res.end(out);
 }).listen(config.server.port, config.server.host);
