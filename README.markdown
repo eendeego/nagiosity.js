@@ -3,7 +3,7 @@ Nagiosity.js - Port of Nagiosity to node.js
 
 ## Description
 
-This is just a port of nagiosity with an aditional goodness of JSON output.
+This is just a port of nagiosity with an aditional goodness of JSON/JSONP output.
 
 The original project can be found at http://code.google.com/p/nagiosity/
 
@@ -34,6 +34,10 @@ JSON output (same fields as the original nagiosity):
 JSON full output (entire contents of nagios.js as JSON):
 
     curl http://127.0.0.1:3999/nagios/status?verbose
+
+JSONP output supported through the callback parameter (verbose or not):
+
+    curl http://127.0.0.1:3999/nagios/status?callback=updateNagiosState
 
 XML output (same format as the original nagiosity):
 

@@ -17,6 +17,8 @@ var HOST_LABEL = "hoststatus";
 var SERVICE_LABEL = "servicestatus";
 var PROGRAM_LABEL = "programstatus";
 
+var MIME_TYPES = { json : 'application/json', xml : 'text/xml', jsonp : 'application/javascript'};
+
 // http://stackoverflow.com/questions/18082/validate-numbers-in-javascript-isnumeric
 function isNumeric(input) {
    return input.length > 0 && (input - 0) == input;
@@ -149,20 +151,22 @@ function jsonVerbose(status) {
   return JSON.stringify(status);
 }
 
+function jsonpWrap(json, callback) {
+  return callback + '(' + json + ')';
+}
+
 var formatters = {
   json : { simple : jsonStatus, verbose : jsonVerbose },
   xml : { simple : xmlStatus, verbose : xmlStatus }
 };
 
-var mime_types = { json : 'application/json', xml : 'text/xml'};
-
 http.createServer(function (req, res) {
-  var format;
+  var format = 'json';
 
-  var req_url = url.parse(req.url);
+  var req_url = url.parse(req.url, true);
   var pathname = req_url.pathname;
 
-  var dot_pos = req_url.pathname.lastIndexOf('.');
+  var dot_pos = pathname.lastIndexOf('.');
   if(dot_pos != -1) {
     format = pathname.substr(dot_pos + 1);
     pathname = pathname.substr(0, dot_pos);
@@ -174,22 +178,38 @@ http.createServer(function (req, res) {
     return;
   }
 
-  if(req.headers.accept == mime_types.xml) { format = 'xml'; }
+  if(req.headers.accept == MIME_TYPES.xml) { format = 'xml'; }
   if(format != 'xml') { format = 'json'; }
 
-  var verboseness = req_url.search == '?verbose' ? 'verbose' : 'simple';
+  var verboseness = req_url.query && 'verbose' in req_url.query ? 'verbose' : 'simple';
+  var formatter = formatters[format][verboseness];
+
+  if(req_url.query && 'callback' in req_url.query) {
+    if(format != 'json') {
+      res.writeHead(400);
+      res.end();
+      return;
+    }
+
+    format = 'jsonp';
+    var jsonFormatter = formatter;
+    formatter = function(status) {
+      return jsonpWrap(jsonFormatter(status), req_url.query.callback);
+    };
+  }
 
   fs.readFile(config.nagios.status_file, 'utf8', function(err, data) {
       if (err) {
         res.writeHead(500);
+        res.end();
         throw err;
       }
 
-      var out = formatters[format][verboseness](parseStatus(data));
+      var out = formatter(parseStatus(data));
 
       res.writeHead(200, {
           'Content-Length': out.length,
-          'Content-Type': mime_types[format]
+          'Content-Type': MIME_TYPES[format]
         });
       res.end(out);
     });
