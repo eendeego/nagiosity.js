@@ -17,11 +17,15 @@ var HOST_LABEL = "hoststatus";
 var SERVICE_LABEL = "servicestatus";
 var PROGRAM_LABEL = "programstatus";
 
-var MIME_TYPES = { json : 'application/json', xml : 'text/xml', jsonp : 'application/javascript'};
+var MIME_TYPES = {
+  json : 'application/json',
+  jsonp : 'application/javascript',
+  xml : 'text/xml'
+};
 
 // http://stackoverflow.com/questions/18082/validate-numbers-in-javascript-isnumeric
 function isNumeric(input) {
-   return input.length > 0 && (input - 0) == input;
+  return input.length > 0 && (input - 0) == input;
 }
 
 // Parse the status.dat file and extract matching object definitions
@@ -151,6 +155,7 @@ function jsonVerbose(status) {
   return JSON.stringify(status);
 }
 
+// JSONP wrapping
 function jsonpWrap(json, callback) {
   return callback + '(' + json + ')';
 }
@@ -161,6 +166,11 @@ var formatters = {
 };
 
 http.createServer(function (req, res) {
+  function sendStatusCode(code) {
+    res.writeHead(code);
+    res.end();
+  }
+
   var format = 'json';
 
   var req_url = url.parse(req.url, true);
@@ -173,21 +183,23 @@ http.createServer(function (req, res) {
   }
 
   if(pathname != config.server.path) {
-    res.writeHead(404);
-    res.end();
+    sendStatusCode(404);
     return;
   }
 
   if(req.headers.accept == MIME_TYPES.xml) { format = 'xml'; }
+
+  // Fallback to json if format unknown or invalid
   if(format != 'xml') { format = 'json'; }
 
-  var verboseness = req_url.query && 'verbose' in req_url.query ? 'verbose' : 'simple';
+  var verboseness =
+    req_url.query && 'verbose' in req_url.query ? 'verbose' : 'simple';
   var formatter = formatters[format][verboseness];
 
+  // Support for JSONP
   if(req_url.query && 'callback' in req_url.query) {
     if(format != 'json') {
-      res.writeHead(400);
-      res.end();
+      sendStatusCode(400);
       return;
     }
 
@@ -198,19 +210,57 @@ http.createServer(function (req, res) {
     };
   }
 
-  fs.readFile(config.nagios.status_file, 'utf8', function(err, data) {
-      if (err) {
-        res.writeHead(500);
-        res.end();
-        throw err;
+  fs.open(config.nagios.status_file, 'r',
+    function(err, fd) {
+      // Wrap up short responses
+      function closeAndsendStatusCode(code) {
+        fs.close(fd);
+        sendStatusCode(code);
+      }
+      // Wrap up errors
+      function manageError(err) {
+        if(err) {
+          closeAndsendStatusCode(500);
+          throw err;
+        }
       }
 
-      var out = formatter(parseStatus(data));
+      manageError(err);
 
-      res.writeHead(200, {
-          'Content-Length': out.length,
-          'Content-Type': MIME_TYPES[format]
+      fs.fstat(fd,
+        function(err, stats) {
+          manageError(err);
+
+          var mtime = new Date(stats.mtime);
+
+          // Support for client side caching
+          if('if-modified-since' in req.headers &&
+             mtime <= new Date(req.headers['if-modified-since'])) {
+
+            closeAndsendStatusCode(304);
+            return;
+          }
+
+          var buffer = new Buffer(stats.size);
+          var totalRead = 0;
+          fs.read(fd, buffer, 0, stats.size, 0,
+            function(err, bytesRead) {
+              manageError(err);
+
+              totalRead += bytesRead;
+              if(totalRead == stats.size) {
+                fs.close(fd);
+
+                var out = formatter(parseStatus(buffer.toString()));
+
+                res.writeHead(200, {
+                    'Content-Length' : out.length,
+                    'Content-Type'   : MIME_TYPES[format],
+                    'Last-Modified'  : new Date(mtime).toUTCString()
+                  });
+                res.end(out);
+              }
+            });
         });
-      res.end(out);
     });
 }).listen(config.server.port, config.server.host);
