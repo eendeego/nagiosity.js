@@ -42,7 +42,8 @@ function parseStatus(data) {
         return "\"" + name + "\":" +
           (value == '' ?
            "null" :
-           (isNumeric(value) ? value : "\"" + value.replace('\"','\\\"') + "\"")) +
+           (isNumeric(value) ? value :
+            "\"" + value.replace(/"/g, '\\\"') + "\"")) +
           ",";
       }).
     replace(/\s+\{\n/g,"{ ").
