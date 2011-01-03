@@ -242,31 +242,32 @@ http.createServer(function (req, res) {
             return;
           }
 
-          var buffer = new Buffer(stats.size);
-          var totalRead = 0;
-
-          (function read() {
-            fs.read(fd, buffer, totalRead, stats.size-totalRead, totalRead,
+          (function read(totalRead, buffer, callback) {
+            fs.read(fd, buffer, totalRead, stats.size - totalRead, totalRead,
               function(err, bytesRead) {
                 manageError(err);
 
                 totalRead += bytesRead;
                 if(totalRead != stats.size) {
-                  read();
+                  read(totalRead, buffer, callback);
                 } else {
                   fs.close(fd);
 
-                  var out = formatter(parseStatus(buffer.toString()));
-
-                  res.writeHead(200, {
-                      'Content-Length' : out.length,
-                      'Content-Type'   : MIME_TYPES[format],
-                      'Last-Modified'  : new Date(mtime).toUTCString()
-                    });
-                  res.end(out);
+                  callback(buffer.toString());
                 }
               });
-          })();
+          })(0, new Buffer(stats.size),
+            function(data) {
+              var out = formatter(parseStatus(data));
+
+              res.writeHead(200, {
+                  'Content-Length' : out.length,
+                  'Content-Type'   : MIME_TYPES[format],
+                  'Last-Modified'  : mtime.toUTCString()
+                });
+              res.end(out);
+            }
+          );
         });
     });
 }).listen(config.server.port, config.server.host);
