@@ -244,24 +244,29 @@ http.createServer(function (req, res) {
 
           var buffer = new Buffer(stats.size);
           var totalRead = 0;
-          fs.read(fd, buffer, 0, stats.size, 0,
-            function(err, bytesRead) {
-              manageError(err);
 
-              totalRead += bytesRead;
-              if(totalRead == stats.size) {
-                fs.close(fd);
+          (function read() {
+            fs.read(fd, buffer, totalRead, stats.size-totalRead, totalRead,
+              function(err, bytesRead) {
+                manageError(err);
 
-                var out = formatter(parseStatus(buffer.toString()));
+                totalRead += bytesRead;
+                if(totalRead != stats.size) {
+                  read();
+                } else {
+                  fs.close(fd);
 
-                res.writeHead(200, {
-                    'Content-Length' : out.length,
-                    'Content-Type'   : MIME_TYPES[format],
-                    'Last-Modified'  : new Date(mtime).toUTCString()
-                  });
-                res.end(out);
-              }
-            });
+                  var out = formatter(parseStatus(buffer.toString()));
+
+                  res.writeHead(200, {
+                      'Content-Length' : out.length,
+                      'Content-Type'   : MIME_TYPES[format],
+                      'Last-Modified'  : new Date(mtime).toUTCString()
+                    });
+                  res.end(out);
+                }
+              });
+          })();
         });
     });
 }).listen(config.server.port, config.server.host);
