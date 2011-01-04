@@ -19,25 +19,13 @@ Install this script and its configuration file on a user/dir with access to nagi
 Copy the config.js.sample file to config.js and customize it.
 
 Note: You may or may not be making too much information available through this app. If this is your situation here are 2 solutions:
-* Place an Apache / Nginx server with a proper authentication mechanism in front of this script if this is an issue for you.
-* Serve only to localhost and install clients to this app on the same machine.
+* Place an Apache / Nginx server with a proper authentication mechanism in front of this script.
+* Serve only to localhost and install the clients to this app on the same machine.
 
-This script has been tested with node.js 0.2.4 and 0.3.2 and with Nagios 3.2.3.
+This script has been tested with node.js 0.2.4 and 0.3.2/0.3.3 and with Nagios 3.2.3.
 
 ## Usage
 (Default parameters)
-
-JSON output (same fields as the original nagiosity):
-
-    curl http://127.0.0.1:3999/nagios/status
-
-JSON full output (entire contents of nagios.js as JSON):
-
-    curl http://127.0.0.1:3999/nagios/status?verbose
-
-JSONP output supported through the callback parameter (verbose or not):
-
-    curl http://127.0.0.1:3999/nagios/status?callback=updateNagiosState
 
 XML output (same format as the original nagiosity):
 
@@ -47,7 +35,35 @@ or:
 
     curl -H "Accept: text/xml" http://127.0.0.1:3999/nagios/status
 
-There is no equivalent to verbose output in xml format.
+JSON output (same fields as the original nagiosity):
+
+    curl http://127.0.0.1:3999/nagios/status
+
+The HTTP Header If-Modified-Since is supported for both formats, enabling client side caching.
+
+JSON supports the following output options:
+
+    verbose - Return full nagios state
+    callback/jsonp - JSONP padding [JSONP]{http://bob.pythonmac.org/archives/2005/12/05/remote-json-jsonp/}
+    indent - JSON output indentation (as defined in [JSON]{https://developer.mozilla.org/En/Using_native_JSON})
+
+Examples:
+
+JSON full output (entire contents of nagios status.dat file as JSON):
+
+    curl http://127.0.0.1:3999/nagios/status?verbose
+
+JSONP output:
+
+    curl http://127.0.0.1:3999/nagios/status?callback=updateNagiosState
+
+JSON indented full output (useful for debugging):
+
+    curl http://127.0.0.1:3999/nagios/status?verbose\&indent=4
+
+JSONP indented verbose output:
+
+    curl http://127.0.0.1:3999/nagios/status?callback=updateNagiosState\&verbose\&indent=2
 
 ## LICENSE:
 

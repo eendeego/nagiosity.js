@@ -129,47 +129,50 @@ function xmlStatus(status, query) {
   return output;
 }
 
-// Output as JSON 
+// Output as JSON
 function jsonStatus(status, query) {
-  if('verbose' in query) {
-    return JSON.stringify(status);
-  };
-
-  // same structure as original nagiosity
-  var out = {
+  var out =
+    ('verbose' in query) ?
+    status :
+    { // same structure as original nagiosity
       name               : "nagios",
       last_command_check : status.last_command_check,
-      hosts              : []
+      hosts              : status.hosts.map(function(host) {
+          return {
+            host_name       : host.host_name,
+            current_state   : host.current_state,
+            current_attempt : host.current_attempt,
+            last_check      : host.last_check,
+            services        : host.services.map(function(service) {
+                return {
+                  service_description : service.service_description,
+                  current_state       : service.current_state,
+                  current_attempt     : service.current_attempt,
+                  last_check          : service.last_check
+                };
+              })
+          };
+        })
     };
 
-  status.hosts.forEach(function(host) {
-      out.hosts.push({
-        host_name       : host.host_name,
-        current_state   : host.current_state,
-        current_attempt : host.current_attempt,
-        last_check      : host.last_check,
-        services        : host.services.map(function(service) {
-            return {
-              service_description : service.service_description,
-              current_state       : service.current_state,
-              current_attempt     : service.current_attempt,
-              last_check          : service.last_check
-            };
-          })
-      });
-    });
-
-  return JSON.stringify(out);
+  return JSON.stringify(out, null,
+    ('indent' in query) ?
+    (isNumeric(query.indent) ? query.indent-0 : query.indent) :
+    0);
 }
 
 // JSONP wrapping
-function jsonpWrap(json, query) {
-  return query.callback + '(' + json + ')';
+function jsonpStatus(status, query) {
+  var callback =
+    ('callback' in query) ? query.callback :
+    ('jsonp' in query) ? query.jsonp : '';
+  return callback + '(' + jsonStatus(status, query) + ')';
 }
 
-var formatters = {
-  json : jsonStatus,
-  xml : xmlStatus
+var FORMATTERS = {
+  json  : jsonStatus,
+  jsonp : jsonpStatus,
+  xml   : xmlStatus
 };
 
 http.createServer(function (req, res) {
@@ -190,7 +193,8 @@ http.createServer(function (req, res) {
       req.pathname = req.pathname.substr(0, dot_pos);
     }
 
-    if('accept' in req.headers && req.headers.accept in MIME_TYPES_TO_FORMATS) {
+    if('accept' in req.headers &&
+       req.headers.accept in MIME_TYPES_TO_FORMATS) {
       req.format = MIME_TYPES_TO_FORMATS[req.headers.accept];
     }
 
@@ -211,25 +215,15 @@ http.createServer(function (req, res) {
     return;
   }
 
-  if(!req.format in formatters) {
+  if(!req.format in FORMATTERS) {
     sendStatusCode(406); // Not Acceptable
     return;
   }
 
-  var formatter = formatters[req.format];
-
   // Support for JSONP
-  if('callback' in req.url.query) {
-    if(req.format != 'json' && req.format != 'jsonp') {
-      sendStatusCode(400); // Bad Request
-      return;
-    }
-
+  if(req.format == 'json' &&
+     ('callback' in req.url.query || 'jsonp' in req.url.query)) {
     req.format = 'jsonp';
-    var jsonFormatter = formatter;
-    formatter = function(status, query) {
-      return jsonpWrap(jsonFormatter(status, query), query);
-    };
   }
 
   fs.open(config.nagios.status_file, 'r',
@@ -279,7 +273,7 @@ http.createServer(function (req, res) {
               });
           })(0, new Buffer(stats.size),
             function(data) {
-              var out = formatter(parseStatus(data), req.url.query);
+              var out = FORMATTERS[req.format](parseStatus(data), req.url.query);
 
               res.writeHead(200, { // OK
                   'Content-Length' : out.length,
