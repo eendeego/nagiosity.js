@@ -17,11 +17,17 @@ var HOST_LABEL = "hoststatus";
 var SERVICE_LABEL = "servicestatus";
 var PROGRAM_LABEL = "programstatus";
 
-var MIME_TYPES = {
-  json : 'application/json',
-  jsonp : 'application/javascript',
-  xml : 'text/xml'
-};
+var MIME_TYPES_TO_FORMATS = {};
+var FORMATS_TO_MIME_TYPES = {};
+
+function registerMimeType(mimeType, format) {
+  MIME_TYPES_TO_FORMATS[mimeType] = format;
+  FORMATS_TO_MIME_TYPES[format] = mimeType;
+}
+
+registerMimeType('application/json'      , 'json');
+registerMimeType('application/javascript', 'jsonp');
+registerMimeType('text/xml'              , 'xml');
 
 // http://stackoverflow.com/questions/18082/validate-numbers-in-javascript-isnumeric
 function isNumeric(input) {
@@ -88,8 +94,8 @@ function xmlAttr(data, key) {
   return key + "=\'" + data[key] + "\' ";
 }
 
-// Output as XML (similar to original nagiosity)
-function xmlStatus(status) {
+// Output as XML similar to original nagiosity
+function xmlStatus(status, query) {
   var output = "<?xml version='1.0'?>\n";
 
   // Information about Nagios running state
@@ -123,8 +129,13 @@ function xmlStatus(status) {
   return output;
 }
 
-// Output as JSON (same structure as original nagiosity)
-function jsonStatus(status) {
+// Output as JSON 
+function jsonStatus(status, query) {
+  if('verbose' in query) {
+    return JSON.stringify(status);
+  };
+
+  // same structure as original nagiosity
   var out = {
       name               : "nagios",
       last_command_check : status.last_command_check,
@@ -151,19 +162,14 @@ function jsonStatus(status) {
   return JSON.stringify(out);
 }
 
-// Output as JSON (full nagios.dat dump)
-function jsonVerbose(status) {
-  return JSON.stringify(status);
-}
-
 // JSONP wrapping
-function jsonpWrap(json, callback) {
-  return callback + '(' + json + ')';
+function jsonpWrap(json, query) {
+  return query.callback + '(' + json + ')';
 }
 
 var formatters = {
-  json : { simple : jsonStatus, verbose : jsonVerbose },
-  xml : { simple : xmlStatus, verbose : xmlStatus }
+  json : jsonStatus,
+  xml : xmlStatus
 };
 
 http.createServer(function (req, res) {
@@ -172,42 +178,57 @@ http.createServer(function (req, res) {
     res.end();
   }
 
-  var format = 'json';
+  function normalizeRequest() {
+    req.format = 'json';
 
-  var req_url = url.parse(req.url, true);
-  var pathname = req_url.pathname;
+    req.url = url.parse(req.url, true);
+    req.pathname = req.url.pathname;
 
-  var dot_pos = pathname.lastIndexOf('.');
-  if(dot_pos != -1) {
-    format = pathname.substr(dot_pos + 1);
-    pathname = pathname.substr(0, dot_pos);
+    var dot_pos = req.pathname.lastIndexOf('.');
+    if(dot_pos != -1) {
+      req.format = req.pathname.substr(dot_pos + 1);
+      req.pathname = req.pathname.substr(0, dot_pos);
+    }
+
+    if('accept' in req.headers && req.headers.accept in MIME_TYPES_TO_FORMATS) {
+      req.format = MIME_TYPES_TO_FORMATS[req.headers.accept];
+    }
+
+    if(!'query' in req.url) {
+      req.url.query = {};
+    }
   }
 
-  if(pathname != config.server.path) {
-    sendStatusCode(404);
+  normalizeRequest();
+
+  if(req.method != 'GET') {
+    sendStatusCode(405); // Method Not Allowed
     return;
   }
 
-  if(req.headers.accept == MIME_TYPES.xml) { format = 'xml'; }
+  if(req.pathname != config.server.path) {
+    sendStatusCode(404); // Not Found
+    return;
+  }
 
-  // Fallback to json if format unknown or invalid
-  if(format != 'xml') { format = 'json'; }
+  if(!req.format in formatters) {
+    sendStatusCode(406); // Not Acceptable
+    return;
+  }
 
-  var verboseness =
-    req_url.query && 'verbose' in req_url.query ? 'verbose' : 'simple';
-  var formatter = formatters[format][verboseness];
+  var formatter = formatters[req.format];
 
   // Support for JSONP
-  if(req_url.query && 'callback' in req_url.query) {
-    if(format != 'json') {
-      sendStatusCode(400);
+  if('callback' in req.url.query) {
+    if(req.format != 'json' && req.format != 'jsonp') {
+      sendStatusCode(400); // Bad Request
       return;
     }
 
-    format = 'jsonp';
+    req.format = 'jsonp';
     var jsonFormatter = formatter;
-    formatter = function(status) {
-      return jsonpWrap(jsonFormatter(status), req_url.query.callback);
+    formatter = function(status, query) {
+      return jsonpWrap(jsonFormatter(status, query), query);
     };
   }
 
@@ -221,7 +242,7 @@ http.createServer(function (req, res) {
       // Wrap up errors
       function manageError(err) {
         if(err) {
-          closeAndsendStatusCode(500);
+          closeAndsendStatusCode(500); // Internal Server Error
           throw err;
         }
       }
@@ -238,7 +259,7 @@ http.createServer(function (req, res) {
           if('if-modified-since' in req.headers &&
              mtime <= new Date(req.headers['if-modified-since'])) {
 
-            closeAndsendStatusCode(304);
+            closeAndsendStatusCode(304); // Not Modified
             return;
           }
 
@@ -258,11 +279,11 @@ http.createServer(function (req, res) {
               });
           })(0, new Buffer(stats.size),
             function(data) {
-              var out = formatter(parseStatus(data));
+              var out = formatter(parseStatus(data), req.url.query);
 
-              res.writeHead(200, {
+              res.writeHead(200, { // OK
                   'Content-Length' : out.length,
-                  'Content-Type'   : MIME_TYPES[format],
+                  'Content-Type'   : FORMATS_TO_MIME_TYPES[req.format],
                   'Last-Modified'  : mtime.toUTCString()
                 });
               res.end(out);
