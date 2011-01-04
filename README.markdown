@@ -19,6 +19,7 @@ Install this script and its configuration file on a user/dir with access to nagi
 Copy the config.js.sample file to config.js and customize it.
 
 Note: You may or may not be making too much information available through this app. If this is your situation here are 2 solutions:
+
 * Place an Apache / Nginx server with a proper authentication mechanism in front of this script.
 * Serve only to localhost and install the clients to this app on the same machine.
 
@@ -43,9 +44,9 @@ The HTTP Header If-Modified-Since is supported for both formats, enabling client
 
 JSON supports the following output options:
 
-    verbose - Return full nagios state
-    callback/jsonp - JSONP padding [JSONP]{http://bob.pythonmac.org/archives/2005/12/05/remote-json-jsonp/}
-    indent - JSON output indentation (as defined in [JSON]{https://developer.mozilla.org/En/Using_native_JSON})
+* verbose - Return full nagios state
+* callback/jsonp - [JSONP](http://bob.pythonmac.org/archives/2005/12/05/remote-json-jsonp/) padding
+* indent - JSON output indentation (as defined in [JSON](https://developer.mozilla.org/En/Using_native_JSON))
 
 Examples:
 
