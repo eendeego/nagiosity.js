@@ -198,7 +198,7 @@ http.createServer(function (req, res) {
       req.format = MIME_TYPES_TO_FORMATS[req.headers.accept];
     }
 
-    if(!'query' in req.url) {
+    if(!('query' in req.url)) {
       req.url.query = {};
     }
   }
