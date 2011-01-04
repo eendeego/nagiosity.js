@@ -215,7 +215,7 @@ http.createServer(function (req, res) {
     return;
   }
 
-  if(!req.format in FORMATTERS) {
+  if(!(req.format in FORMATTERS)) {
     sendStatusCode(406); // Not Acceptable
     return;
   }
