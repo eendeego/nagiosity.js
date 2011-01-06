@@ -29,6 +29,10 @@ registerMimeType('application/json'      , 'json');
 registerMimeType('application/javascript', 'jsonp');
 registerMimeType('text/xml'              , 'xml');
 
+process.on('uncaughtException', function(err) {
+  logger.log('Caught exception: ' + err.message + '\n' + err.stack);
+});
+
 // http://stackoverflow.com/questions/18082/validate-numbers-in-javascript-isnumeric
 function isNumeric(input) {
   return input.length > 0 && (input - 0) == input;
@@ -230,7 +234,7 @@ http.createServer(function (req, res) {
     function(err, fd) {
       // Wrap up short responses
       function closeAndsendStatusCode(code) {
-        fs.close(fd);
+        try { fs.close(fd); } catch(exception) {}
         sendStatusCode(code);
       }
       // Wrap up errors
